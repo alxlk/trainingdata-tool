@@ -24,7 +24,7 @@ size_t max_games_to_convert = 10000000;
 
 struct Options {
   bool verbose = false;
-  bool lichess_mode = false;
+  bool fishtest_mode = false;
 };
 
 inline bool file_exists(const std::string& name) {
@@ -39,10 +39,10 @@ uint64_t resever_bits_in_bytes(uint64_t v) {
   return v;
 }
 
-bool extract_lichess_comment_score(const char* comment, float& Q) {
+bool extract_fishtest_comment_score(const char* comment, float& Q) {
   std::string s(comment);
-  static std::regex rgx("\\[%eval (-?\\d+\\.\\d+)\\]");
-  static std::regex rgx2("\\[%eval #(-?\\d+)\\]");
+  static std::regex rgx("\\{(-?\\d+\\.\\d\\d)/");
+  static std::regex rgx2("\\{#(-?\\d\\d)/");
   std::smatch matches;
   if (std::regex_search(s, matches, rgx)) {
     Q = std::stof(matches[1].str());
@@ -227,17 +227,17 @@ bool write_one_game_training_data(pgn_t* pgn, int game_id, Options options) {
     // Extract SF scores and convert to win probability
     float Q = 0.0f;
     if (pgn->last_read_comment[0]) {
-      float lichess_score;
+      float fishtest_score;
       if (move_is_mate(move, board)) {
-        lichess_score = position_history.Last().IsBlackToMove() ? -128.0f : 128.0f;
+        fishtest_score = position_history.Last().IsBlackToMove() ? -128.0f : 128.0f;
       } else {
-        bool success = extract_lichess_comment_score(pgn->last_read_comment,
-                                                     lichess_score);
+        bool success = extract_fishtest_comment_score(pgn->last_read_comment,
+                                                     fishtest_score);
         if (!success) {
           break;  // Comment contained no "%eval"
         }
       }
-      Q = convert_sf_score_to_win_probability(lichess_score);
+      Q = convert_sf_score_to_win_probability(fishtest_score);
 
       // Since there is at least one move to write, initialize the writer
       if (!writer) {
@@ -246,7 +246,7 @@ bool write_one_game_training_data(pgn_t* pgn, int game_id, Options options) {
             "supervised-" + std::to_string(game_id / max_games_per_directory));
         game_id++;
       }
-    } else if (options.lichess_mode) {
+    } else if (options.fishtest_mode) {
       // This game has no comments, skip it.
       break;
     }
@@ -304,9 +304,9 @@ int main(int argc, char* argv[]) {
       std::cout << "Verbose mode ON" << std::endl;
       options.verbose = true;
     } else if (0 ==
-               static_cast<std::string>("-lichess-mode").compare(argv[idx])) {
-      std::cout << "Lichess mode ON" << std::endl;
-      options.lichess_mode = true;
+               static_cast<std::string>("-fishtest-mode").compare(argv[idx])) {
+      std::cout << "fishtest mode ON" << std::endl;
+      options.fishtest_mode = true;
     } else if (0 ==
                static_cast<std::string>("-games-per-dir").compare(argv[idx])) {
       max_games_per_directory = std::atoi(argv[idx + 1]);
